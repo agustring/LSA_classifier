@@ -31,112 +31,122 @@ def read_frames(label, user, sample, input_folder):
           break
     return vid
 
-def neck_video(label, user, sample):
-    data_neck = []
-    
+def neck_video(label, user, sample):    
     frames = read_frames(label, user, sample,input_folder)
+    
     with mp_pose.Pose(
         static_image_mode=False,
         model_complexity=2,
         enable_segmentation=True,
         min_detection_confidence=0.8) as pose:
-        for i in range(len(frames)):
-            image = cv2.flip(frames[i], 1)
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            results = pose.process(image)
-            if not results.pose_landmarks:
-                neck_x = np.nan
-                neck_y = np.nan
-            else:
-                # 12: mp_pose.PoseLandmark.RIGHT_SHOULDER
-                # 11: mp_pose.PoseLandmark.LEFT_SHOULDER
-                neck_x = (results.pose_landmarks.landmark[12].x + results.pose_landmarks.landmark[11].x)/2
-                neck_y = (results.pose_landmarks.landmark[12].y + results.pose_landmarks.landmark[11].y)/2
-            data_neck.append({
-                'x': neck_x,
-                'y': neck_y
-                })
+        
+            data_neck = np.zeros(len(frames),dtype=object)
+            
+            insider = np.zeros(3,dtype=float)
+            
+            for i in range(len(frames)):
+                image = cv2.flip(frames[i], 1)
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                results = pose.process(image)
+                if not results.pose_landmarks:
+                    pass
+                else:
+                    # 12: mp_pose.PoseLandmark.RIGHT_SHOULDER
+                    # 11: mp_pose.PoseLandmark.LEFT_SHOULDER
+                    neck_x = (results.pose_landmarks.landmark[12].x + results.pose_landmarks.landmark[11].x)/2
+                    neck_y = (results.pose_landmarks.landmark[12].y + results.pose_landmarks.landmark[11].y)/2
+                    neck_z = (results.pose_landmarks.landmark[12].z + results.pose_landmarks.landmark[11].z)/2
+                    insider[:] = [neck_x,neck_y,neck_z]
+                    
+                data_neck[i] = insider
 
-        return data_neck
+    return data_neck
     
 def hands_video(label, user, sample):
     
     frames = read_frames(label, user, sample,input_folder)
     
-    data_right = {}
-    data_left = {}
-    for i in range(21):
-        data_right[str(i)] = []
-        data_left[str(i)] = []
-    
     with mp_hands.Hands(
     static_image_mode=False,
     max_num_hands=2,
-    min_detection_confidence=0.7) as hands:
+    min_detection_confidence=0.9) as hands:
+        
+        data = np.zeros(len(frames),dtype=object)
+        right = np.zeros((21+1,3))
+        left = np.zeros((21,3))
+        insider = np.zeros(3,dtype=float)
+        
         for i in range(len(frames)):
             im2 = frames[i]        
             # Convert the BGR image to RGB before processing.
             image = cv2.flip(cv2.cvtColor(im2[:,:,0:3], cv2.COLOR_BGR2RGB), 1)
             results = hands.process(image)
+            # insider[:] = np.nan
+            
             if not results.multi_hand_landmarks:
+
                 pass
             else:
-                    hand_landmarks = results.multi_hand_landmarks[0]
-                    if str(results.multi_handedness[0]).find("Right")>1:
-                        for i in range(len(hand_landmarks.landmark)):
-                            data_right[str(i)].append({
-                                'x': hand_landmarks.landmark[i].x,
-                                'y': hand_landmarks.landmark[i].y,
-                                'z': hand_landmarks.landmark[i].z
-                            })  
-                    else:
-                        for i in range(len(hand_landmarks.landmark)):
-                            data_left[str(i)].append({
-                                'x': hand_landmarks.landmark[i].x,
-                                'y': hand_landmarks.landmark[i].y,
-                                'z': hand_landmarks.landmark[i].z
-                            })
-                            
-                    if len(results.multi_hand_landmarks)==2:
-                        if str(results.multi_handedness[1]).find("Left")>1:
-                            hand_landmarks = results.multi_hand_landmarks[1]
-                            for i in range(len(hand_landmarks.landmark)):
-                                data_left[str(i)].append({
-                                    'x': hand_landmarks.landmark[i].x,
-                                    'y': hand_landmarks.landmark[i].y,
-                                    'z': hand_landmarks.landmark[i].z
-                                })
-                        else:
-                            for i in range(len(hand_landmarks.landmark)):
-                                data_right[str(i)].append({
-                                    'x': hand_landmarks.landmark[i].x,
-                                    'y': hand_landmarks.landmark[i].y,
-                                    'z': hand_landmarks.landmark[i].z
-                                }) 
-                                
-        return data_right,data_left
-    
-import json
+                a = len(results.multi_hand_landmarks)
+                if a > 2:
+                    a = 2 
+                for j in range(a):
+                 if str(results.multi_handedness[j]).find("Right")>1:
+                     for k in range(21):
+                         insider[:] = [results.multi_hand_landmarks[j].landmark[k].x,
+                                       results.multi_hand_landmarks[j].landmark[k].y,
+                                       results.multi_hand_landmarks[j].landmark[k].z]
+                         right[k,:] = insider[:]
+                 elif str(results.multi_handedness[j]).find("Left")>1:
+                     for k in range(21):
+                         insider[:] = [results.multi_hand_landmarks[j].landmark[k].x,
+                                       results.multi_hand_landmarks[j].landmark[k].y,
+                                       results.multi_hand_landmarks[j].landmark[k].z]
+                         left[k,:] = insider[:]
+                         
+            data[i] = np.concatenate((left,right))
+    return data   
+ 
+import codecs, json 
+import time
 
 def procPerson(label):
-    import time
     t1 = time.time()
+    x=0
     for user in range(1,16):
+        
         u = '00'+str(user)
+        
         if user>9:
             u = '0'+str(user)
+            
         for sample in range(1,6):
             t2 = time.time()
             s = '00'+str(sample)
-            R,L = hands_video(label,u,s)
+            
+            H = hands_video(label,u,s)
             N = neck_video(label,u,s)
-            with open('theRealDataset\preproc data\{}_{}_{}_R.txt'.format(label, u, s), 'w') as outfile:
-                json.dump(R, outfile)
-            with open('theRealDataset\preproc data\{}_{}_{}_L.txt'.format(label, u, s), 'w') as outfile:
-                json.dump(L, outfile)
-            with open('theRealDataset\preproc data\{}_{}_{}_N.txt'.format(label, u, s), 'w') as outfile:
-                json.dump(N, outfile)
-            print('It en segundos: ',(time.time()-t2))
+            
+            data = np.zeros(len(H),dtype=object)
+            data[:][:len(data)] = H
+            
+            for i in range(len(data)):
+                data[i][42] = N[i]
+                data[i] = data[i].tolist()
+                
+            real_list = data.tolist()
+            file_path = 'theRealDataset\preproc data\{}_{}_{}_pre.json'.format(label, u, s)
+            json.dump(real_list, codecs.open(file_path, 'w', encoding='utf-8'), 
+                      separators=(',', ':'), sort_keys=True, indent=4)
+            
+            print('Video numero ',x,' en segundos: ',(time.time()-t2))
+            x+=1
     print('Todo en minutos: ',(time.time()-t1)/60)
 
-procPerson('006')          
+procPerson('010')          
+
+#UNJSONIFY
+
+# obj_text = codecs.open(file_path, 'r', encoding='utf-8').read()
+# b_new = json.loads(obj_text)
+# a_new = np.array(b_new)

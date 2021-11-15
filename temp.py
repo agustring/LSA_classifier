@@ -82,10 +82,10 @@ for i in range(1,16):
         b = '0'+str(i)
     else:
         b = '00'+str(i)
-    frames = read_frames('008',b,'004','theRealDataset\edit data')    
+    frames = read_frames('010',b,'004','theRealDataset\edit data')    
     fourcc = cv2.VideoWriter_fourcc(*'MP42')
     
-    video = cv2.VideoWriter('testing8{}.mp4'.format(i), fourcc, float(fps), (width, hieght))
+    video = cv2.VideoWriter('testingX{}.mp4'.format(i), fourcc, float(fps), (width, hieght))
     
     with mp_hands.Hands(
         static_image_mode=False,
