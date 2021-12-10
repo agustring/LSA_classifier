@@ -42,7 +42,7 @@ def neck_video(label, user, sample):
         
             data_neck = np.zeros(len(frames),dtype=object)
             
-            insider = np.zeros(3,dtype=float)
+            insider = np.zeros(2,dtype=float)
             
             for i in range(len(frames)):
                 image = cv2.flip(frames[i], 1)
@@ -55,8 +55,8 @@ def neck_video(label, user, sample):
                     # 11: mp_pose.PoseLandmark.LEFT_SHOULDER
                     neck_x = (results.pose_landmarks.landmark[12].x + results.pose_landmarks.landmark[11].x)/2
                     neck_y = (results.pose_landmarks.landmark[12].y + results.pose_landmarks.landmark[11].y)/2
-                    neck_z = (results.pose_landmarks.landmark[12].z + results.pose_landmarks.landmark[11].z)/2
-                    insider[:] = [neck_x,neck_y,neck_z]
+                    # neck_z = (results.pose_landmarks.landmark[12].z + results.pose_landmarks.landmark[11].z)/2
+                    insider[:] = [neck_x,neck_y]
                     
                 data_neck[i] = insider
 
@@ -72,9 +72,9 @@ def hands_video(label, user, sample):
     min_detection_confidence=0.9) as hands:
         
         data = np.zeros(len(frames),dtype=object)
-        right = np.zeros((21+1,3))
-        left = np.zeros((21,3))
-        insider = np.zeros(3,dtype=float)
+        right = np.zeros((21,2))
+        left = np.zeros((21,2))
+        insider = np.zeros(2,dtype=float)
         
         for i in range(len(frames)):
             im2 = frames[i]        
@@ -94,14 +94,14 @@ def hands_video(label, user, sample):
                  if str(results.multi_handedness[j]).find("Right")>1:
                      for k in range(21):
                          insider[:] = [results.multi_hand_landmarks[j].landmark[k].x,
-                                       results.multi_hand_landmarks[j].landmark[k].y,
-                                       results.multi_hand_landmarks[j].landmark[k].z]
+                                       results.multi_hand_landmarks[j].landmark[k].y]
+                                       # results.multi_hand_landmarks[j].landmark[k].z]
                          right[k,:] = insider[:]
                  elif str(results.multi_handedness[j]).find("Left")>1:
                      for k in range(21):
                          insider[:] = [results.multi_hand_landmarks[j].landmark[k].x,
-                                       results.multi_hand_landmarks[j].landmark[k].y,
-                                       results.multi_hand_landmarks[j].landmark[k].z]
+                                       results.multi_hand_landmarks[j].landmark[k].y]
+                                       # results.multi_hand_landmarks[j].landmark[k].z]
                          left[k,:] = insider[:]
                          
             data[i] = np.concatenate((left,right))
@@ -131,7 +131,10 @@ def procPerson(label):
             data[:][:len(data)] = H
             
             for i in range(len(data)):
-                data[i][42] = N[i]
+                for j in range(len(data[i])):
+                    data[i][j][0] = float(data[i][j][0] - N[i][0])
+                    data[i][j][1] = float(data[i][j][1] - N[i][1])
+                    data[i][j] = data[i][j].tolist()
                 data[i] = data[i].tolist()
                 
             real_list = data.tolist()
@@ -143,8 +146,14 @@ def procPerson(label):
             x+=1
     print('Todo en minutos: ',(time.time()-t1)/60)
 
-procPerson('010')          
+        
 
+for user in range(6,10):
+    u = '00'+str(user)
+    if user>9:
+        u = '0'+str(user)
+    procPerson(u)  
+        
 #UNJSONIFY
 
 # obj_text = codecs.open(file_path, 'r', encoding='utf-8').read()
