@@ -146,8 +146,8 @@ def procPerson(label):
             x+=1
     print('Todo en minutos: ',(time.time()-t1)/60)
 
-        
-
+#For preprocesing the whole data 
+       
 for user in range(6,10):
     u = '00'+str(user)
     if user>9:
